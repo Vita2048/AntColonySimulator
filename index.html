@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ant Colony Simulation</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body {
+            display: flex;
+            /* Changed to row to place canvas and legend side-by-side */
+            flex-direction: row;
+            align-items: flex-start; /* Align items to the top */
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #282c34; /* Dark background for overall page */
+            font-family: 'Inter', sans-serif;
+            color: #ffffff;
+            padding-top: 50px; /* Add padding to make space for the top button and input */
+            position: relative; /* For absolute positioning of the button */
+        }
+        canvas {
+            border: 2px solid #555;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            display: block; /* Remove extra space below canvas */
+            margin-right: 30px; /* Space between canvas and legend */
+        }
+        .controls {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            z-index: 10;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4CAF50; /* Green */
+            color: white;
+            border: none;
+            border-radius: 5px;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            outline: none;
+        }
+        button:hover {
+            background-color: #45a049;
+            transform: translateY(-2px);
+        }
+        button:active {
+            background-color: #3e8e41;
+            transform: translateY(0);
+        }
+        input[type="number"] {
+            padding: 8px 12px;
+            font-size: 16px;
+            border: 1px solid #555;
+            border-radius: 5px;
+            background-color: #3a3f47;
+            color: #ffffff;
+            width: 80px;
+            text-align: center;
+        }
+        input[type="number"]:focus {
+            outline: none;
+            border-color: #4CAF50;
+            box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.5);
+        }
+        #legend {
+            margin-top: 0; /* Reset margin-top as it's now aligned with canvas top */
+            padding: 15px;
+            background-color: #3a3f47;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            text-align: left;
+            width: 250px; /* Adjust width as needed */
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            /* Changed height to align bottom with canvas */
+            height: 600px; /* Match canvas height for alignment */
+            box-sizing: border-box; /* Include padding in the height calculation */
+        }
+        #legend h3 {
+            margin-top: 0;
+            color: #ffffff;
+            font-size: 18px;
+            border-bottom: 1px solid #555;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+        }
+        #legend .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        #legend .legend-item img {
+            width: 32px; /* Size of ant sprite */
+            height: 32px;
+            margin-right: 10px;
+            border-radius: 4px; /* Slightly rounded corners for images */
+        }
+        #legend .legend-item p {
+            margin: 0;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <label for="antCount">Number of Ants:</label>
+        <input type="number" id="antCount" value="30" min="1" max="200">
+        <button id="resetButton">Reset Colony</button>
+    </div>
+    <script>
+        // Global variables for p5.js
+        let antWhiteSprite;
+        let antBrownSprite;
+        let antYellowSprite;
+        let anthillSprite;
+        let foodSourceSprite;
+
+        let ants = []; // Array to store all ant objects
+        let antCountInput; // Reference to the ant count input element
+
+        // Anthill and food source properties
+        const ANTHILL_POS = { x: 50, y: 300 };
+        const FOOD_SOURCE_POS = { x: 750, y: 300 };
+        const INTERACTION_RADIUS = 50; // Radius for ant-food/anthill interaction
+        const ANT_COLLISION_RADIUS = 20; // Radius for ant-ant collision (for food transfer and overlap prevention)
+
+        // Preload function to load assets before setup
+        function preload() {
+            // Load ant sprites from the provided GitHub URLs
+            antWhiteSprite = loadImage('https://vita2048.github.io/AntColonySimulator/AntWhite.png');
+            antBrownSprite = loadImage('https://vita2048.github.io/AntColonySimulator/AntBrown.png');
+            antYellowSprite = loadImage('https://vita2048.github.io/AntColonySimulator/AntYellow.png');
+            anthillSprite = loadImage('https://vita2048.github.io/AntColonySimulator/AntHill.png');
+            foodSourceSprite = loadImage('https://vita2048.github.io/AntColonySimulator/AntFood.png');
+        }
+
+        // Setup function, runs once when the program starts
+        function setup() {
+            const canvas = createCanvas(800, 600); // Create a 800x600 pixel canvas
+            canvas.parent(document.body); // Attach canvas to the body element
+            frameRate(30); // Set frame rate to 30 FPS for smooth animation
+            imageMode(CENTER); // Draw images from their center
+
+            // Get references to the HTML elements
+            antCountInput = select('#antCount'); // Get the input element by ID
+            let resetButton = select('#resetButton'); // Get the button element by ID
+
+            // Attach reset function to button click
+            resetButton.mousePressed(resetColony);
+
+            initializeAnts(); // Initialize the ants for the first time
+        }
+
+        // Draw function, runs repeatedly every frame
+        function draw() {
+            background(0, 100, 0); // Dark green background
+
+            // Draw anthill and food source sprites
+            // Scale down anthill and food source for display
+            image(anthillSprite, ANTHILL_POS.x, ANTHILL_POS.y, 64, 64);
+            image(foodSourceSprite, FOOD_SOURCE_POS.x, FOOD_SOURCE_POS.y, 64, 64);
+
+            // Iterate through all ants, update their state and draw them
+            for (let i = ants.length - 1; i >= 0; i--) {
+                let ant = ants[i];
+                ant.update();
+                ant.display();
+
+                // Handle ant-food interaction
+                // If a white or brown ant is close to the food source
+                if (ant.state === 'white' || ant.state === 'brown') {
+                    let d = dist(ant.x, ant.y, FOOD_SOURCE_POS.x, FOOD_SOURCE_POS.y);
+                    if (d < INTERACTION_RADIUS) {
+                        ant.state = 'yellow'; // Change to yellow (carrying food)
+                        ant.hasFood = true;
+                        ant.foodLocation = { x: FOOD_SOURCE_POS.x, y: FOOD_SOURCE_POS.y }; // Store food location
+                        ant.targetX = ANTHILL_POS.x; // Set target to anthill
+                        ant.targetY = ANTHILL_POS.y;
+                    }
+                }
+
+                // Handle ant-anthill interaction (only for yellow ants returning food)
+                if (ant.state === 'yellow') {
+                    let d = dist(ant.x, ant.y, ANTHILL_POS.x, ANTHILL_POS.y);
+                    if (d < INTERACTION_RADIUS) {
+                        // Ant reaches anthill, remove it from simulation (simulates dropping food)
+                        ants.splice(i, 1);
+                    }
+                }
+
+                // Handle ant-ant collision for food transfer and overlap prevention
+                for (let j = i + 1; j < ants.length; j++) { // Check collision with other ants (only once per pair)
+                    let otherAnt = ants[j];
+                    let d = dist(ant.x, ant.y, otherAnt.x, otherAnt.y);
+
+                    // Overlap prevention: if ants are too close, push them apart
+                    if (d < ANT_COLLISION_RADIUS * 1.5 && d > 0) { // Use a slightly larger radius for repulsion
+                        // Calculate vector from otherAnt to ant
+                        let dx = ant.x - otherAnt.x;
+                        let dy = ant.y - otherAnt.y;
+                        let angle = atan2(dy, dx);
+
+                        // Calculate overlap amount
+                        let overlap = (ANT_COLLISION_RADIUS * 1.5) - d;
+
+                        // Move ants apart by half the overlap
+                        let moveAmount = overlap / 2;
+                        ant.x += cos(angle) * moveAmount;
+                        ant.y += sin(angle) * moveAmount;
+                        otherAnt.x -= cos(angle) * moveAmount;
+                        otherAnt.y -= sin(angle) * moveAmount;
+
+                        // Add a small random perturbation to their directions to help them move around each other
+                        ant.direction += random(-0.1, 0.1);
+                        otherAnt.direction += random(-0.1, 0.1);
+                    }
+
+                    // Food transfer: if a yellow or brown ant collides with a white ant
+                    // The condition for food transfer now uses the same radius as overlap prevention for consistency.
+                    if ((ant.state === 'yellow' || ant.state === 'brown') && otherAnt.state === 'white' && d < ANT_COLLISION_RADIUS * 1.5) {
+                        otherAnt.state = 'brown'; // White ant turns brown
+                        otherAnt.hasFood = false; // Brown ant doesn't carry food yet
+                        otherAnt.foodLocation = ant.foodLocation; // Transfer food location
+                        otherAnt.targetX = otherAnt.foodLocation.x; // Brown ant heads to food
+                        otherAnt.targetY = otherAnt.foodLocation.y;
+                    }
+                    // Also check the reverse: if otherAnt (yellow or brown) collides with ant (white)
+                    else if ((otherAnt.state === 'yellow' || otherAnt.state === 'brown') && ant.state === 'white' && d < ANT_COLLISION_RADIUS * 1.5) {
+                        ant.state = 'brown'; // White ant turns brown
+                        ant.hasFood = false;
+                        ant.foodLocation = otherAnt.foodLocation;
+                        ant.targetX = ant.foodLocation.x;
+                        ant.targetY = ant.foodLocation.y;
+                    }
+                }
+            }
+        }
+
+        // Ant class definition
+        class Ant {
+            constructor(x, y, state = 'white') {
+                this.x = x;
+                this.y = y;
+                this.speed = 2; // Speed of the ant
+                this.direction = random(TWO_PI); // Initial random direction (radians)
+                this.state = state; // 'white', 'yellow', 'brown'
+                this.hasFood = false; // Whether the ant is carrying food
+                this.foodLocation = null; // Stores location of food source if known
+                this.targetX = null; // Target x-coordinate for directed movement
+                this.targetY = null; // Target y-coordinate for directed movement
+                this.sprite = antWhiteSprite; // Initial sprite
+                this.turnTimer = 0; // Timer for random direction changes
+            }
+
+            // Update ant's position and state logic
+            update() {
+                // Update sprite based on state
+                if (this.state === 'white') {
+                    this.sprite = antWhiteSprite;
+                } else if (this.state === 'brown') {
+                    this.sprite = antBrownSprite;
+                } else if (this.state === 'yellow') {
+                    this.sprite = antYellowSprite;
+                }
+
+                if (this.state === 'white') {
+                    // Random movement for white ants
+                    this.turnTimer++;
+                    if (this.turnTimer % 15 === 0) { // Change direction every 15 frames
+                        this.direction += random(-0.1, 0.1); // Small random direction change
+                    }
+                    this.x += this.speed * cos(this.direction);
+                    this.y += this.speed * sin(this.direction);
+                } else if (this.state === 'brown') {
+                    // Move directly towards food for brown ants
+                    if (this.foodLocation) {
+                        let angle = atan2(this.foodLocation.y - this.y, this.foodLocation.x - this.x);
+                        this.x += this.speed * cos(angle);
+                        this.y += this.speed * sin(angle);
+                        this.direction = angle; // Align ant direction with movement
+                    }
+                } else if (this.state === 'yellow') {
+                    // Move directly towards anthill for yellow ants
+                    if (this.targetX !== null && this.targetY !== null) {
+                        let angle = atan2(this.targetY - this.y, this.targetX - this.x);
+                        this.x += this.speed * cos(angle);
+                        this.y += this.speed * sin(angle);
+                        this.direction = angle; // Align ant direction with movement
+                    }
+                }
+
+                this.constrainToCanvas(); // Keep ants within canvas boundaries by bouncing
+            }
+
+            // Display ant sprite
+            display() {
+                push();
+                translate(this.x, this.y);
+                rotate(this.direction + HALF_PI); // Rotate sprite to face direction of movement (p5.js images are usually drawn facing up)
+                image(this.sprite, 0, 0, 32, 32); // Scale sprite down to 32x32 pixels
+                pop();
+            }
+
+            // Prevent ants from leaving canvas boundaries by bouncing off edges
+            constrainToCanvas() {
+                let bounced = false;
+                // Check horizontal boundaries
+                if (this.x < 0) {
+                    this.x = 0; // Set position to boundary
+                    this.direction = PI - this.direction; // Reflect direction horizontally
+                    bounced = true;
+                } else if (this.x > width) {
+                    this.x = width; // Set position to boundary
+                    this.direction = PI - this.direction; // Reflect direction horizontally
+                    bounced = true;
+                }
+                // Check vertical boundaries
+                if (this.y < 0) {
+                    this.y = 0; // Set position to boundary
+                    this.direction = TWO_PI - this.direction; // Reflect direction vertically
+                    bounced = true;
+                } else if (this.y > height) {
+                    this.y = height; // Set position to boundary
+                    this.direction = TWO_PI - this.direction; // Reflect direction vertically
+                    bounced = true;
+                }
+
+                // Add a small random perturbation to the direction after a bounce
+                // This helps prevent ants from getting stuck in a perfect back-and-forth loop
+                if (bounced) {
+                    this.direction += random(-0.2, 0.2);
+                }
+            }
+        }
+
+        // Initialize all ants at random positions and set their initial state to 'white'
+        function initializeAnts() {
+            // Get the number of ants from the input field, default to 30 if invalid
+            // Changed antCountInput.value to antCountInput.value() to correctly retrieve the value from p5.Element
+            let numAnts = parseInt(antCountInput.value());
+            if (isNaN(numAnts) || numAnts < 1) {
+                numAnts = 30; // Default value
+                antCountInput.value(30); // Update input field using value() method
+            }
+
+            ants = []; // Clear existing ants
+            for (let i = 0; i < numAnts; i++) {
+                // Random position within canvas bounds
+                let x = random(width);
+                let y = random(height);
+                ants.push(new Ant(x, y, 'white'));
+            }
+        }
+
+        // Reset the colony: scatter ants, reset states, etc.
+        function resetColony() {
+            initializeAnts(); // Re-initialize ants with the current input value
+            console.log("Colony reset!");
+        }
+    </script>
+    <!-- Legend for Ant States -->
+    <div id="legend">
+        <h3>Ant Legend</h3>
+        <div class="legend-item">
+            <img src="https://vita2048.github.io/AntColonySimulator/AntWhite.png" alt="White Ant">
+            <p>Not aware of food location, moves randomly.</p>
+        </div>
+        <div class="legend-item">
+            <img src="https://vita2048.github.io/AntColonySimulator/AntBrown.png" alt="Brown Ant">
+            <p>Knows food location, moves directly towards it.</p>
+        </div>
+        <div class="legend-item">
+            <img src="https://vita2048.github.io/AntColonySimulator/AntYellow.png" alt="Yellow Ant">
+            <p>Carries food, moves directly towards the anthill.</p>
+        </div>
+    </div>
+</body>
+</html>
