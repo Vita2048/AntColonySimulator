@@ -76,7 +76,7 @@
             margin-top: 0; /* Reset margin-top as it's now aligned with canvas top */
             padding: 15px;
             background-color: #3a3f47;
-            border-radius: 8px;
+            border-radius: 8_px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             text-align: left;
             width: 250px; /* Adjust width as needed */
@@ -142,8 +142,7 @@
         const ANT_ANIMATION_SPEED_DELAY = 1;
         const ANT_ANIMATION_FRAME_STEP = 4;
         const ANT_DISPLAY_SIZE = 40; // Adjusted display size for ants, slightly larger
-        const ANT_COLLISION_RADIUS = ANT_DISPLAY_SIZE / 2 * 0.8; // Set collision radius to 80% of display size for better visual fit
-
+        const ANT_COLLISION_RADIUS = ANT_DISPLAY_SIZE / 2 * 1.5; // Increased collision radius
 
         // Preload function to load assets before setup
         function preload() {
@@ -186,7 +185,7 @@
                     let d = dist(ant.x, ant.y, FOOD_SOURCE_POS.x, FOOD_SOURCE_POS.y);
                     if (d < INTERACTION_RADIUS) {
                         if (ant.state !== 'yellow') { // Only change state if not already yellow
-                            ant.setState('yellow'); // Use the setter to reset frameIndex
+                            ant.setState('yellow'); // Use the setter to reset frameIndex and trigger glow
                             ant.hasFood = true;
                             ant.foodLocation = { x: FOOD_SOURCE_POS.x, y: FOOD_SOURCE_POS.y };
                             ant.targetX = ANTHILL_POS.x;
@@ -206,12 +205,12 @@
                     let otherAnt = ants[j];
                     let d = dist(ant.x, ant.y, otherAnt.x, otherAnt.y);
 
-                    if (d < ANT_COLLISION_RADIUS * 1.5 && d > 0) {
+                    if (d < ANT_COLLISION_RADIUS && d > 0) { // Changed to ANT_COLLISION_RADIUS
                         let dx = ant.x - otherAnt.x;
                         let dy = ant.y - otherAnt.y;
                         let angle = atan2(dy, dx);
 
-                        let overlap = (ANT_COLLISION_RADIUS * 1.5) - d;
+                        let overlap = ANT_COLLISION_RADIUS - d; // Calculate overlap based on new radius
 
                         let moveAmount = overlap / 2;
                         ant.x += cos(angle) * moveAmount;
@@ -219,20 +218,21 @@
                         otherAnt.x -= cos(angle) * moveAmount;
                         otherAnt.y -= sin(angle) * moveAmount;
 
-                        ant.direction += random(-0.1, 0.1);
-                        otherAnt.direction += random(-0.1, 0.1);
+                        // Add a small random turn to both ants to prevent sticking
+                        ant.direction += random(-0.3, 0.3); 
+                        otherAnt.direction += random(-0.3, 0.3);
                     }
 
                     // Food transfer logic, only if the ants are close enough
-                    if (d < ANT_COLLISION_RADIUS * 1.5) {
+                    if (d < ANT_COLLISION_RADIUS) { // Changed to ANT_COLLISION_RADIUS
                         if ((ant.state === 'yellow' || ant.state === 'brown') && otherAnt.state === 'white') {
-                            otherAnt.setState('brown'); // Use the setter to reset frameIndex
+                            otherAnt.setState('brown'); // Use the setter to reset frameIndex and trigger glow
                             otherAnt.hasFood = false;
                             otherAnt.foodLocation = ant.foodLocation;
                             otherAnt.targetX = otherAnt.foodLocation.x;
                             otherAnt.targetY = otherAnt.foodLocation.y;
                         } else if ((otherAnt.state === 'yellow' || otherAnt.state === 'brown') && ant.state === 'white') {
-                            ant.setState('brown'); // Use the setter to reset frameIndex
+                            ant.setState('brown'); // Use the setter to reset frameIndex and trigger glow
                             ant.hasFood = false;
                             ant.foodLocation = otherAnt.foodLocation;
                             ant.targetX = ant.foodLocation.x;
@@ -260,14 +260,16 @@
                 this.frameIndex = 0;
                 this.animationCounter = 0;
                 this.displaySize = ANT_DISPLAY_SIZE;
+                this.glowAlpha = 0; // New property for glow animation
             }
 
-            // Setter for state to handle frameIndex reset
+            // Setter for state to handle frameIndex reset and glow
             set state(newState) {
                 if (this._state !== newState) {
                     this._state = newState;
                     this.frameIndex = 0; // Reset animation when state changes
                     this.animationCounter = 0;
+                    this.glowAlpha = 255; // Start glow animation
                 }
             }
 
@@ -286,6 +288,11 @@
                 if (this.animationCounter >= ANT_ANIMATION_SPEED_DELAY) {
                     this.frameIndex = (this.frameIndex + ANT_ANIMATION_FRAME_STEP) % ANT_TOTAL_FRAMES;
                     this.animationCounter = 0;
+                }
+
+                if (this.glowAlpha > 0) {
+                    this.glowAlpha -= 10; // Fade out the glow
+                    if (this.glowAlpha < 0) this.glowAlpha = 0;
                 }
 
                 if (this.state === 'white') {
@@ -318,6 +325,13 @@
                 push();
                 translate(this.x, this.y);
                 rotate(this.direction + HALF_PI);
+
+                // Draw glow if active
+                if (this.glowAlpha > 0) {
+                    noStroke();
+                    fill(0, 191, 255, this.glowAlpha); // Blue glow
+                    ellipse(0, 0, this.displaySize * 1.2, this.displaySize * 1.2); // Larger than ant
+                }
 
                 let col = this.frameIndex % ANT_FRAMES_PER_ROW;
                 let row = floor(this.frameIndex / ANT_FRAMES_PER_ROW);
@@ -417,4 +431,3 @@
     </div>
 </body>
 </html>
-```
