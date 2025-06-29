@@ -139,10 +139,18 @@
         const ANT_FRAME_HEIGHT = 248;
         const ANT_FRAMES_PER_ROW = 8;
         const ANT_TOTAL_FRAMES = 62;
-        const ANT_ANIMATION_SPEED_DELAY = 1;
-        const ANT_ANIMATION_FRAME_STEP = 4;
+        const ANT_ANIMATION_FRAME_STEP = 1; // Kept at 1 as requested
         const ANT_DISPLAY_SIZE = 40; // Adjusted display size for ants, slightly larger
         const ANT_COLLISION_RADIUS = ANT_DISPLAY_SIZE / 2 * 1.5; // Increased collision radius
+
+        // New constant for animation speed multiplier
+        const ANT_ANIMATION_SPEED_MULTIPLIER = 5.5; // From user request, for faster leg animation
+
+        // Constants for glow animation
+        const GLOW_DURATION = 40; // Total frames for glow animation
+        const GLOW_INTENSIFY_PHASE_RATIO = 0.3; // First 30% of animation for intensifying
+        const GLOW_INITIAL_RADIUS_FACTOR = 0.1; // Glow starts at 10% of ant size
+        const GLOW_MAX_RADIUS_EXPANSION_FACTOR = 2.5; // Glow expands up to 2.5 times ant size
 
         // Preload function to load assets before setup
         function preload() {
@@ -158,8 +166,9 @@
         function setup() {
             const canvas = createCanvas(800, 600);
             canvas.parent(document.body);
-            frameRate(30);
+            frameRate(45); // Kept at 45 for overall simulation speed
             imageMode(CENTER);
+            // colorMode(HSB, 255); // Removed from here, now applied locally in Ant.display()
 
             antCountInput = select('#antCount');
             let resetButton = select('#resetButton');
@@ -171,7 +180,7 @@
 
         // Draw function, runs repeatedly every frame
         function draw() {
-            background(0, 100, 0);
+            background(0, 100, 0); // Kept green background (RGB values)
 
             image(anthillSprite, ANTHILL_POS.x, ANTHILL_POS.y, 64, 64);
             image(foodSourceSprite, FOOD_SOURCE_POS.x, FOOD_SOURCE_POS.y, 64, 64);
@@ -248,7 +257,7 @@
             constructor(x, y, state = 'white') {
                 this.x = x;
                 this.y = y;
-                this.speed = 1;
+                this.speed = 1.5; // Kept at 1.5 for 50% faster movement
                 this.direction = random(TWO_PI);
                 this._state = state; // Use a private variable for state
                 this.hasFood = false;
@@ -258,18 +267,34 @@
                 this.turnTimer = 0;
 
                 this.frameIndex = 0;
-                this.animationCounter = 0;
+                this.animationCounter = 0; // This will now accumulate fractional values
                 this.displaySize = ANT_DISPLAY_SIZE;
-                this.glowAlpha = 0; // New property for glow animation
+                
+                // Glow animation properties
+                this.glowAlpha = 0; // Current glow opacity
+                this.glowRadius = 0; // Current glow radius
+                this.glowHue = 0; // Current glow hue (HSB)
+                this.glowTimer = 0; // Timer for glow animation progress
             }
 
-            // Setter for state to handle frameIndex reset and glow
+            // Setter for state to handle frameIndex reset and trigger glow
             set state(newState) {
                 if (this._state !== newState) {
                     this._state = newState;
                     this.frameIndex = 0; // Reset animation when state changes
                     this.animationCounter = 0;
-                    this.glowAlpha = 255; // Start glow animation
+                    
+                    // Start glow animation
+                    this.glowTimer = 1; // Start from 1 to avoid division by zero
+                    
+                    // Set glow hue based on new state
+                    if (newState === 'brown') {
+                        this.glowHue = 25; // A warm brown hue (HSB: 25, 180, 150)
+                    } else if (newState === 'yellow') {
+                        this.glowHue = 50; // A yellow hue (HSB: 50, 255, 255)
+                    } else {
+                        this.glowHue = random(120, 200); // Default blue-green for white/initial state
+                    }
                 }
             }
 
@@ -282,19 +307,41 @@
                 this.state = newState; // Call the setter
             }
 
-
             update() {
-                this.animationCounter++;
-                if (this.animationCounter >= ANT_ANIMATION_SPEED_DELAY) {
+                // Ant leg animation update
+                this.animationCounter += ANT_ANIMATION_SPEED_MULTIPLIER; 
+                while (this.animationCounter >= 1) {
                     this.frameIndex = (this.frameIndex + ANT_ANIMATION_FRAME_STEP) % ANT_TOTAL_FRAMES;
-                    this.animationCounter = 0;
+                    this.animationCounter -= 1; 
                 }
 
-                if (this.glowAlpha > 0) {
-                    this.glowAlpha -= 10; // Fade out the glow
-                    if (this.glowAlpha < 0) this.glowAlpha = 0;
+                // Glow animation update
+                if (this.glowTimer > 0 && this.glowTimer <= GLOW_DURATION) {
+                    let progress = this.glowTimer / GLOW_DURATION; // Progress from 0 to 1
+
+                    // Radius: Starts small, grows, then expands further
+                    this.glowRadius = map(progress, 0, 1, 
+                                        this.displaySize * GLOW_INITIAL_RADIUS_FACTOR, 
+                                        this.displaySize * GLOW_MAX_RADIUS_EXPANSION_FACTOR);
+
+                    // Alpha: Intensifies then fades
+                    if (progress <= GLOW_INTENSIFY_PHASE_RATIO) {
+                        // Intensifying phase: alpha goes from 0 to 255
+                        this.glowAlpha = map(progress, 0, GLOW_INTENSIFY_PHASE_RATIO, 0, 255);
+                    } else {
+                        // Fading phase: alpha goes from 255 to 0
+                        this.glowAlpha = map(progress, GLOW_INTENSIFY_PHASE_RATIO, 1, 255, 0);
+                    }
+                    
+                    this.glowAlpha = constrain(this.glowAlpha, 0, 255); // Ensure alpha is within valid range
+
+                    this.glowTimer++; // Advance glow animation timer
+                } else {
+                    this.glowAlpha = 0; // Ensure glow is fully off when animation finishes
+                    this.glowTimer = 0; // Reset timer, ready for next state change
                 }
 
+                // Ant movement logic (remains unchanged)
                 if (this.state === 'white') {
                     this.turnTimer++;
                     if (this.turnTimer % 15 === 0) {
@@ -328,9 +375,22 @@
 
                 // Draw glow if active
                 if (this.glowAlpha > 0) {
+                    push(); // Isolate color mode change for glow
+                    colorMode(HSB, 255); // Set color mode to HSB specifically for the glow
                     noStroke();
-                    fill(0, 191, 255, this.glowAlpha); // Blue glow
-                    ellipse(0, 0, this.displaySize * 1.2, this.displaySize * 1.2); // Larger than ant
+                    
+                    // Outer glow layer (more transparent, larger)
+                    // Adjust saturation and brightness based on glow state/color
+                    let glowSaturation = this.state === 'brown' ? 180 : 255;
+                    let glowBrightness = this.state === 'brown' ? 150 : 255;
+
+                    fill(this.glowHue, glowSaturation, glowBrightness, this.glowAlpha / 2); 
+                    ellipse(0, 0, this.glowRadius * 1.5, this.glowRadius * 1.5); 
+
+                    // Inner glow layer (more opaque, smaller)
+                    fill(this.glowHue, glowSaturation, glowBrightness, this.glowAlpha); 
+                    ellipse(0, 0, this.glowRadius, this.glowRadius); 
+                    pop(); // Revert to previous color mode (RGB by default)
                 }
 
                 let col = this.frameIndex % ANT_FRAMES_PER_ROW;
