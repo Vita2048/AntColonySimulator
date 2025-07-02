@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ant Survival Simulation</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+<style>
+    body {
+        display: flex;
+        flex-direction: column; /* Stack items vertically */
+        align-items: center; /* Center horizontally */
+        justify-content: flex-start; /* Align to top */
+        min-height: 100vh;
+        margin: 0;
+        background-color: #282c34;
+        font-family: 'Inter', sans-serif;
+        color: #ffffff;
+        overflow: auto; /* Allow scrolling if content overflows */
+        padding-top: 20px; /* Add padding to ensure top controls are not at the very edge */
+    }
+    canvas {
+        border: 2px solid #555;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        display: block;
+        margin-top: 20px; /* Space between top controls and canvas */
+    }
+    .controls-top {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 20px; /* Space between top controls and canvas */
+        z-index: 10;
+    }
+    .team-controls {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        padding: 20px;
+        background-color: #3a3f47;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        width: 200px;
+        box-sizing: border-box;
+        align-items: stretch;
+        position: absolute;
+        top: 100px; /* Align with top of canvas, adjusted for controls-top and padding */
+    }
+    #yellow-team-controls {
+        left: calc(50% - 450px - 220px); /* Left of canvas: canvas half-width (400px) + gap (20px) + control width (200px) */
+    }
+    #red-team-controls {
+        right: calc(50% - 450px - 220px); /* Right of canvas: canvas half-width (400px) + gap (20px) + control width (200px) */
+    }
+    .team-controls h3 {
+        margin-top: 0;
+        color: #ffffff;
+        font-size: 18px;
+        border-bottom: 1px solid #555;
+        padding-bottom: 5px;
+        margin-bottom: 10px;
+        text-align: center;
+    }
+    .slider-group {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+    }
+    .slider-group label {
+        margin-bottom: 5px;
+        font-size: 14px;
+        text-align: center;
+    }
+    input[type="range"] {
+        width: 100%;
+        -webkit-appearance: none;
+        height: 8px;
+        background: #555;
+        border-radius: 5px;
+        outline: none;
+        opacity: 0.7;
+        transition: opacity .2s;
+    }
+    input[type="range"]:hover {
+        opacity: 1;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: #4CAF50;
+        cursor: pointer;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+    input[type="range"]::-moz-range-thumb {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: #4CAF50;
+        cursor: pointer;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+    button {
+        padding: 10px 20px;
+        font-size: 16px;
+        cursor: pointer;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        transition: background-color 0.3s ease, transform 0.2s ease;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        outline: none;
+    }
+    button:hover {
+        background-color: #45a049;
+        transform: translateY(-2px);
+    }
+    button:active {
+        background-color: #3e8e41;
+        transform: translateY(0);
+    }
+    input[type="number"] {
+        padding: 8px 12px;
+        font-size: 16px;
+        border: 1px solid #555;
+        border-radius: 5px;
+        background-color: #3a3f47;
+        color: #ffffff;
+        width: 80px;
+        text-align: center;
+    }
+    input[type="number"]:focus {
+        outline: none;
+        border-color: #4CAF50;
+        box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.5);
+    }
+    #victoryMessage {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 30px 50px;
+        border-radius: 10px;
+        font-size: 3em;
+        font-weight: bold;
+        text-align: center;
+        z-index: 100;
+        display: none; /* Hidden by default */
+        box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+    }
+</style>
+</head>
+<body>
+<div id="yellow-team-controls" class="team-controls">
+    <h3>Yellow Team Controls</h3>
+    <div class="slider-group">
+        <label for="yellowVisionAngle">Vision Angle: <span id="yellowVisionAngleValue">90°</span></label>
+        <input type="range" id="yellowVisionAngle" min="30" max="130" value="90">
+    </div>
+    <div class="slider-group">
+        <label for="yellowVisionLength">Vision Length: <span id="yellowVisionLengthValue">1.5</span></label>
+        <input type="range" id="yellowVisionLength" min="0.8" max="3.0" step="0.1" value="1.5">
+    </div>
+    <div class="slider-group">
+        <label for="yellowSpeed">Speed: <span id="yellowSpeedValue">1.0</span></label>
+        <input type="range" id="yellowSpeed" min="0.5" max="2.5" step="0.1" value="1.0">
+    </div>
+</div>
+
+    <div class="controls-top">
+        <label for="antCount">Ants per Team:</label>
+        <input type="number" id="antCount" value="7" min="1" max="50">
+        <button id="resetButton">Reset Simulation</button>
+    </div>
+
+    <div id="victoryMessage"></div>
+
+    <script>
+        // Global variables
+        let antYellowSpriteSheet;
+        let antRedSpriteSheet;
+        let foodSourceSprite;
+        let anthillSprite;
+        let ants = [];
+        let food = { x: 0, y: 0, percentage: 100, glowTimer: 0 };
+        let deathAnimations = [];
+        let frameCounter = 0;
+        let yellowAnthill, redAnthill;
+        let simulationRunning = true;
+
+        // UI elements
+        let antCountInput;
+        let yellowVisionAngleSlider, yellowVisionLengthSlider, yellowSpeedSlider;
+        let redVisionAngleSlider, redVisionLengthSlider, redSpeedSlider;
+        let yellowVisionAngleValue, yellowVisionLengthValue, yellowSpeedValue;
+        let redVisionAngleValue, redVisionLengthValue, redSpeedValue;
+        let victoryMessageDiv;
+
+        // Constants
+        const ANT_FRAME_WIDTH = 202;
+        const ANT_FRAME_HEIGHT = 248;
+        const ANT_FRAMES_PER_ROW = 8;
+        const ANT_TOTAL_FRAMES = 62;
+        const ANT_DISPLAY_SIZE = 40;
+        const ANT_COLLISION_RADIUS = ANT_DISPLAY_SIZE / 2 * 1.5;
+        const FOOD_INTERACTION_RADIUS = 30;
+        const VISION_CONE_OFFSET = 0;
+        const LIFE_DECREASE_RATE = 2; // 2% per second
+        const LIFE_INCREASE_AMOUNT = 30; // 30% when eating food
+        const GLOW_DURATION = 60; // frames - used for initial food glow
+        const DEATH_ANIMATION_DURATION = 45; // frames
+        const BASE_ANIMATION_SPEED = 5.5;
+        const FOOD_CONSUMPTION_AMOUNT = 10; // 10% food reduction per visit
+        const ANTHILL_CONTRIBUTION = 5; // 5% anthill completion per food drop
+        const ANTHILL_DISPLAY_SIZE = 80; // Size to display anthill sprite
+        const MIN_FOOD_DISTANCE_FROM_ANTHILL = ANT_DISPLAY_SIZE * 3; // 3 ant lengths
+
+        function preload() {
+            antYellowSpriteSheet = loadImage('https://vita2048.github.io/AntColonySimulator/AntYellowWalking.png');
+            antRedSpriteSheet = loadImage('https://vita2048.github.io/AntColonySimulator/AntRedWalking.png');
+            foodSourceSprite = loadImage('https://vita2048.github.io/AntColonySimulator/AntFood.png');
+            anthillSprite = loadImage('https://vita2048.github.io/AntColonySimulator/AntHill.png');
+        }
+
+        function setup() {
+            const canvas = createCanvas(800, 600);
+            canvas.parent(document.body);
+            frameRate(60);
+            imageMode(CENTER);
+
+            // Initialize UI elements
+            antCountInput = select('#antCount');
+            select('#resetButton').mousePressed(resetSimulation);
+
+            yellowVisionAngleSlider = select('#yellowVisionAngle');
+            yellowVisionLengthSlider = select('#yellowVisionLength');
+            yellowSpeedSlider = select('#yellowSpeed');
+            yellowVisionAngleValue = select('#yellowVisionAngleValue');
+            yellowVisionLengthValue = select('#yellowVisionLengthValue');
+            yellowSpeedValue = select('#yellowSpeedValue');
+
+            redVisionAngleSlider = select('#redVisionAngle');
+            redVisionLengthSlider = select('#redVisionLength');
+            redSpeedSlider = select('#redSpeed');
+            redVisionAngleValue = select('#redVisionAngleValue');
+            redVisionLengthValue = select('#redVisionLengthValue');
+            redSpeedValue = select('#redSpeedValue');
+
+            victoryMessageDiv = select('#victoryMessage');
+
+            // Update slider value displays
+            yellowVisionAngleSlider.input(() => yellowVisionAngleValue.html(yellowVisionAngleSlider.value() + '°'));
+            yellowVisionLengthSlider.input(() => yellowVisionLengthValue.html(yellowVisionLengthSlider.value()));
+            yellowSpeedSlider.input(() => yellowSpeedValue.html(yellowSpeedSlider.value()));
+
+            redVisionAngleSlider.input(() => redVisionAngleValue.html(redVisionAngleSlider.value() + '°'));
+            redVisionLengthSlider.input(() => redVisionLengthValue.html(redVisionLengthSlider.value()));
+            redSpeedSlider.input(() => redSpeedValue.html(redSpeedSlider.value()));
+
+            // Initialize anthills at the edges
+            yellowAnthill = new Anthill(ANTHILL_DISPLAY_SIZE / 2, height / 2, 'Yellow');
+            redAnthill = new Anthill(width - ANTHILL_DISPLAY_SIZE / 2, height / 2, 'Red');
+
+            placeFood();
+            initializeAnts();
+        }
+
+        function draw() {
+
+
+            background(0, 100, 0);
+            frameCounter++;
+
+            drawFood();
+            yellowAnthill.display();
+            redAnthill.display();
+			    if (!simulationRunning) {
+        // Still draw the final state when simulation has ended
+        for (let ant of ants) {
+            ant.display();
+        }
+        // Draw death animations
+        for (let i = deathAnimations.length - 1; i >= 0; i--) {
+            let death = deathAnimations[i];
+            death.timer++;
+
+            push();
+            translate(death.x, death.y);
+            rotate(death.direction + HALF_PI);
+
+            let col = death.frameIndex % ANT_FRAMES_PER_ROW;
+            let row = floor(death.frameIndex / ANT_FRAMES_PER_ROW);
+            let sx = col * ANT_FRAME_WIDTH;
+            let sy = row * ANT_FRAME_HEIGHT;
+
+            let spriteSheet = (death.team === 'Yellow') ? antYellowSpriteSheet : antRedSpriteSheet;
+            image(spriteSheet, 0, 0, ANT_DISPLAY_SIZE, ANT_DISPLAY_SIZE,
+                  sx, sy, ANT_FRAME_WIDTH, ANT_FRAME_HEIGHT);
+
+            pop();
+
+            let flashIntensity = sin(death.timer * 0.5) * 100 + 100;
+            fill(flashIntensity, 0, 0, 120);
+            noStroke();
+            ellipse(death.x, death.y, ANT_DISPLAY_SIZE * 1.5, ANT_DISPLAY_SIZE * 1.5);
+
+            if (death.timer >= DEATH_ANIMATION_DURATION) {
+                deathAnimations.splice(i, 1);
+            }
+        }
+        updateStats();
+        return; // Stop updating ant logic but continue drawing
+    }
+
+            // Update and draw ants
+            for (let i = ants.length - 1; i >= 0; i--) {
+                let ant = ants[i];
+                ant.update();
+
+                // Check if ant died
+                if (ant.life <= 0) {
+                    deathAnimations.push({
+                        x: ant.x,
+                        y: ant.y,
+                        direction: ant.direction,
+                        frameIndex: ant.frameIndex,
+                        team: ant.team,
+                        timer: 0
+                    });
+                    ants.splice(i, 1);
+                    continue;
+                }
+
+                ant.display();
+
+                // Check food interaction
+                if (!ant.hasFood && !ant.targetAnthill) { // Only interact with food if not carrying food or going to anthill
+                    let distToFood = dist(ant.x, ant.y, food.x, food.y);
+                    if (distToFood < FOOD_INTERACTION_RADIUS && food.percentage > 0) {
+                        ant.life = min(100, ant.life + LIFE_INCREASE_AMOUNT);
+                        ant.glowTimer = 1; // Blue glow for ant, set to 1 for persistence
+                        food.percentage = max(0, food.percentage - FOOD_CONSUMPTION_AMOUNT);
+                        ant.hasFood = true;
+                        ant.targetAnthill = true; // Now target anthill
+                        ant.foodTargetX = food.x; // Store food location to return later
+                        ant.foodTargetY = food.y;
+                        if (food.percentage <= 0) {
+                            placeFood(); // Move food to new location if depleted
+                            // Reset glow for all ants if food disappears
+                            for(let otherAnt of ants) {
+                                otherAnt.glowTimer = 0;
+                                otherAnt.targetingFood = false; // Ants lose knowledge of food if it disappears
+                            }
+                        }
+                    }
+                }
+
+// Check anthill interaction
+if (ant.hasFood && ant.targetAnthill) {
+    let targetAnthill = (ant.team === 'Yellow') ? yellowAnthill : redAnthill;
+    let distToAnthill = dist(ant.x, ant.y, targetAnthill.x, targetAnthill.y);
+    if (distToAnthill < FOOD_INTERACTION_RADIUS) {
+        targetAnthill.completion = min(100, targetAnthill.completion + ANTHILL_CONTRIBUTION);
+        ant.hasFood = false;
+        ant.targetAnthill = false;
+        ant.targetFoodLocation = true;
+
+        // Check for victory condition
+        if (targetAnthill.completion >= 100) {
+            targetAnthill.completion = 100; // Ensure it's exactly 100% before ending
+            endSimulation(ant.team);
+        }
+    }
+}
+                
+                // Collision detection with other ants for physical separation and information sharing
+                for (let j = i + 1; j < ants.length; j++) {
+                    let otherAnt = ants[j];
+                    let d = dist(ant.x, ant.y, otherAnt.x, otherAnt.y);
+
+                    if (d < ANT_COLLISION_RADIUS && d > 0) {
+                        let dx = ant.x - otherAnt.x;
+                        let dy = ant.y - otherAnt.y;
+                        let angle = atan2(dy, dx);
+
+                        let overlap = ANT_COLLISION_RADIUS - d;
+                        let moveAmount = overlap / 2;
+
+                        // Push ants apart
+                        ant.x += cos(angle) * moveAmount;
+                        ant.y += sin(angle) * moveAmount;
+                        otherAnt.x -= cos(angle) * moveAmount;
+                        otherAnt.y -= sin(angle) * moveAmount;
+
+                        // Add small random turn to both ants to prevent sticking
+                        ant.direction += random(-0.3, 0.3);
+                        otherAnt.direction += random(-0.3, 0.3);
+
+                        // Information sharing
+                        if (ant.team === otherAnt.team) { // Only share info with teammates
+                            // An ant that knows food location shares it with an unaware teammate
+                            if (ant.targetingFood && !otherAnt.targetingFood) {
+                                otherAnt.targetingFood = true;
+                                otherAnt.glowTimer = 1; // Set to 1 to trigger persistent glow
+                            } else if (!ant.targetingFood && otherAnt.targetingFood) {
+                                ant.targetingFood = true;
+                                ant.glowTimer = 1; // Set to 1 to trigger persistent glow
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Draw death animations
+            for (let i = deathAnimations.length - 1; i >= 0; i--) {
+                let death = deathAnimations[i];
+                death.timer++;
+
+                push();
+                translate(death.x, death.y);
+                rotate(death.direction + HALF_PI);
+
+                // Draw the ant sprite first
+                let col = death.frameIndex % ANT_FRAMES_PER_ROW;
+                let row = floor(death.frameIndex / ANT_FRAMES_PER_ROW);
+                let sx = col * ANT_FRAME_WIDTH;
+                let sy = row * ANT_FRAME_HEIGHT;
+
+                let spriteSheet = (death.team === 'Yellow') ? antYellowSpriteSheet : antRedSpriteSheet;
+                image(spriteSheet, 0, 0, ANT_DISPLAY_SIZE, ANT_DISPLAY_SIZE,
+                      sx, sy, ANT_FRAME_WIDTH, ANT_FRAME_HEIGHT);
+
+                pop();
+
+                // Dark red transparent flashing animation over the ant
+                let flashIntensity = sin(death.timer * 0.5) * 100 + 100;
+                fill(flashIntensity, 0, 0, 120);
+                noStroke();
+                ellipse(death.x, death.y, ANT_DISPLAY_SIZE * 1.5, ANT_DISPLAY_SIZE * 1.5);
+
+                if (death.timer >= DEATH_ANIMATION_DURATION) {
+                    deathAnimations.splice(i, 1);
+                }
+            }
+
+            updateStats();
+        }
+
+        function placeFood() {
+            let newFoodX, newFoodY;
+            let validPosition = false;
+            let attempts = 0;
+            const MAX_ATTEMPTS = 100;
+
+            while (!validPosition && attempts < MAX_ATTEMPTS) {
+                newFoodX = random(50, width - 50);
+                newFoodY = random(50, height - 50);
+
+                let distToYellowAnthill = dist(newFoodX, newFoodY, yellowAnthill.x, yellowAnthill.y);
+                let distToRedAnthill = dist(newFoodX, newFoodY, redAnthill.x, redAnthill.y);
+
+                if (distToYellowAnthill >= MIN_FOOD_DISTANCE_FROM_ANTHILL &&
+                    distToRedAnthill >= MIN_FOOD_DISTANCE_FROM_ANTHILL) {
+                    validPosition = true;
+                }
+                attempts++;
+            }
+
+            if (validPosition) {
+                food.x = newFoodX;
+                food.y = newFoodY;
+                food.percentage = 100;
+                food.glowTimer = GLOW_DURATION; // Yellow glow when food appears
+            } else {
+                // Fallback if a valid position isn't found after many attempts
+                // This might happen in very small canvases or with large MIN_FOOD_DISTANCE_FROM_ANTHILL
+                console.warn("Could not find a valid food spawn location after " + MAX_ATTEMPTS + " attempts. Spawning anywhere.");
+                food.x = random(50, width - 50);
+                food.y = random(50, height - 50);
+                food.percentage = 100;
+                food.glowTimer = GLOW_DURATION;
+            }
+        }
+
+        function drawFood() {
+            // Draw yellow glow if active
+            if (food.glowTimer > 0) {
+                let glowAlpha = map(food.glowTimer, 0, GLOW_DURATION, 0, 150);
+                fill(255, 255, 0, glowAlpha);
+                noStroke();
+                ellipse(food.x, food.y, 80, 80);
+                food.glowTimer--;
+            }
+
+            // Draw food sprite
+            image(foodSourceSprite, food.x, food.y, 40, 40);
+
+            // Draw food percentage label
+            push();
+            fill(255);
+            textAlign(CENTER, BOTTOM);
+            textSize(14);
+            text(Math.floor(food.percentage) + "%", food.x, food.y - 30);
+            pop();
+        }
+
+        class Anthill {
+            constructor(x, y, team) {
+                this.x = x;
+                this.y = y;
+                this.team = team;
+                this.completion = 0;
+            }
+
+            display() {
+                push();
+                imageMode(CENTER);
+
+                // Draw the full anthill sprite with a dark tint for the silhouette effect
+                tint(50, 50, 50, 150); // Dark grey, semi-transparent
+                image(anthillSprite, this.x, this.y, ANTHILL_DISPLAY_SIZE, ANTHILL_DISPLAY_SIZE);
+                noTint(); // Reset tint
+
+                // Calculate the height of the filled portion based on completion
+                let filledHeight = map(this.completion, 0, 100, 0, ANTHILL_DISPLAY_SIZE);
+
+                // Calculate source and destination coordinates for the filled portion
+                let sx = 0;
+                let sy = anthillSprite.height - map(this.completion, 0, 100, 0, anthillSprite.height);
+                let sWidth = anthillSprite.width;
+                let sHeight = map(this.completion, 0, 100, 0, anthillSprite.height);
+
+                let dx = this.x;
+                // Adjust dy to ensure the bottom of the drawn image aligns with the bottom of the anthill display area
+                let dy = this.y + (ANTHILL_DISPLAY_SIZE / 2) - (filledHeight / 2);
+                let dWidth = ANTHILL_DISPLAY_SIZE;
+                let dHeight = filledHeight;
+
+                // Draw the filled portion of the anthill sprite
+                if (filledHeight > 0) { // Only draw if there's something to fill
+                    image(anthillSprite, dx, dy, dWidth, dHeight, sx, sy, sWidth, sHeight);
+                }
+
+                pop();
+
+                // Draw anthill percentage label
+                push();
+                fill(255);
+                textAlign(CENTER, BOTTOM);
+                textSize(14);
+                text(this.team + " \nAnthill: " + Math.floor(this.completion) + "%", this.x, this.y - ANTHILL_DISPLAY_SIZE / 2 - 10);
+                pop();
+            }
+        }
+
+        class Ant {
+            constructor(x, y, team) {
+                this.x = x;
+                this.y = y;
+                this.team = team;
+                this.speed = (team === 'Yellow' ? parseFloat(yellowSpeedSlider.value()) : parseFloat(redSpeedSlider.value()));
+                this.direction = random(TWO_PI);
+                this.life = 100;
+                this.lastLifeUpdate = millis();
+                this.turnTimer = 0;
+                this.frameIndex = 0;
+                this.animationCounter = 0;
+                this.glowTimer = 0; // This now indicates if the ant should glow (0 = no glow, >0 = glow)
+
+                this.visionAngle = (team === 'Yellow' ? radians(parseFloat(yellowVisionAngleSlider.value())) : radians(parseFloat(redVisionAngleSlider.value())));
+                this.visionLength = (team === 'Yellow' ? parseFloat(yellowVisionLengthSlider.value()) : parseFloat(redVisionLengthSlider.value())) * ANT_DISPLAY_SIZE;
+
+                this.targetingFood = false; // True if ant knows where food is
+                this.hasFood = false; // True if ant is carrying food
+                this.targetAnthill = false; // True if ant is going to anthill to drop food
+                this.targetFoodLocation = false; // True if ant is returning to food's last known location
+                this.foodTargetX = 0;
+                this.foodTargetY = 0;
+            }
+
+update() {
+                // Update life (existing code)
+                let currentTime = millis();
+                if (currentTime - this.lastLifeUpdate >= 1000) {
+                    this.life = max(0, this.life - LIFE_DECREASE_RATE);
+                    this.lastLifeUpdate = currentTime;
+                }
+
+                // Update animation based on speed (existing code)
+                let animationSpeed = BASE_ANIMATION_SPEED * (this.speed / 1.0);
+                this.animationCounter += animationSpeed;
+                while (this.animationCounter >= 1) {
+                    this.frameIndex = (this.frameIndex + 1) % ANT_TOTAL_FRAMES;
+                    this.animationCounter -= 1;
+                }
+
+                // Update ant parameters from sliders (existing code)
+                this.speed = (this.team === 'Yellow' ? parseFloat(yellowSpeedSlider.value()) : parseFloat(redSpeedSlider.value()));
+                this.visionAngle = (this.team === 'Yellow' ? radians(parseFloat(yellowVisionAngleSlider.value())) : radians(parseFloat(redVisionAngleSlider.value())));
+                this.visionLength = (this.team === 'Yellow' ? parseFloat(yellowVisionLengthSlider.value()) : parseFloat(redVisionLengthSlider.value())) * ANT_DISPLAY_SIZE;
+
+                // --- MODIFICATION START ---
+                // If ant is currently targeting food (either seen or shared knowledge) and food exists
+                // The 'targetingFood' flag means the ant has current knowledge of food location.
+                if (food.percentage > 0 && this.isFoodInVisionCone()) {
+                    this.targetingFood = true; // Ant sees the food, so it targets it.
+                    this.glowTimer = 1; // Keep glow active
+                } else if (!this.hasFood && !this.targetAnthill && !this.targetFoodLocation && !this.targetingFood && food.percentage > 0) {
+                    // If ant is not carrying food, not going to anthill, not returning to food location,
+                    // and doesn't currently know food location, AND food exists,
+                    // it should be searching (random movement).
+                    // The 'targetingFood' will be set to true by collision or direct vision.
+                    // No change to targetingFood here.
+                } else if (food.percentage <= 0) {
+                    // If food is depleted, no ant should be targeting it.
+                    this.targetingFood = false;
+                    this.glowTimer = 0; // Turn off glow
+                }
+
+
+                // Movement logic
+                if (this.hasFood && this.targetAnthill) {
+                    // Move to anthill (existing code)
+                    let targetAnthill = (this.team === 'Yellow') ? yellowAnthill : redAnthill;
+                    let angle = atan2(targetAnthill.y - this.y, targetAnthill.x - this.x);
+                    this.direction = angle;
+                } else if (this.targetFoodLocation) {
+                    // Move back to food's previous location (existing code)
+                    let distToFoodLocation = dist(this.x, this.y, this.foodTargetX, this.foodTargetY);
+                    if (distToFoodLocation < FOOD_INTERACTION_RADIUS) {
+                        this.targetFoodLocation = false; // Reached previous food location, now search for new food
+                        // IMPORTANT: Do NOT immediately reset targetingFood here.
+                        // The ant might "rediscover" the food if it's still there or get it from a teammate.
+                    } else {
+                        let angle = atan2(this.foodTargetY - this.y, this.foodTargetX - this.x);
+                        this.direction = angle;
+                    }
+                } else if (this.targetingFood) {
+                    // Ant has information about food, so move towards it.
+                    let angle = atan2(food.y - this.y, food.x - this.x);
+                    this.direction = angle;
+                }
+                else {
+                    // Random movement if not targeting food, carrying food, or going to anthill.
+                    this.turnTimer++;
+                    if (this.turnTimer % 15 === 0) {
+                        this.direction += random(-0.2, 0.2);
+                    }
+                }
+                // --- MODIFICATION END ---
+
+                this.x += this.speed * cos(this.direction);
+                this.y += this.speed * sin(this.direction);
+                this.constrainToCanvas();
+            }
+
+            isFoodInVisionCone() {
+                // Return false if food is depleted
+                if (food.percentage <= 0) return false;
+
+                // Calculate vision cone origin
+                let visionOriginX = this.x + cos(this.direction) * VISION_CONE_OFFSET;
+                let visionOriginY = this.y + sin(this.direction) * VISION_CONE_OFFSET;
+
+                const FOOD_SIZE = 40;
+                const FOOD_HALF_SIZE = FOOD_SIZE / 2;
+
+                let distToFood = dist(visionOriginX, visionOriginY, food.x, food.y);
+                if (distToFood > this.visionLength + FOOD_HALF_SIZE * 1.41) return false;
+
+                let leftAngle = this.direction - this.visionAngle / 2;
+                let rightAngle = this.direction + this.visionAngle / 2;
+
+                let triangle = [
+                    { x: visionOriginX, y: visionOriginY },
+                    { x: visionOriginX + this.visionLength * cos(leftAngle), y: visionOriginY + this.visionLength * sin(leftAngle) },
+                    { x: visionOriginX + this.visionLength * cos(rightAngle), y: visionOriginY + this.visionLength * sin(rightAngle) }
+                ];
+
+                let foodRect = [
+                    { x: food.x - FOOD_HALF_SIZE, y: food.y - FOOD_HALF_SIZE },
+                    { x: food.x + FOOD_HALF_SIZE, y: food.y - FOOD_HALF_SIZE },
+                    { x: food.x + FOOD_HALF_SIZE, y: food.y + FOOD_HALF_SIZE },
+                    { x: food.x - FOOD_HALF_SIZE, y: food.y + FOOD_HALF_SIZE }
+                ];
+
+                for (let vertex of foodRect) {
+                    if (this.pointInTriangle(vertex, triangle[0], triangle[1], triangle[2])) {
+                        return true;
+                    }
+                }
+
+                for (let vertex of triangle) {
+                    if (vertex.x >= food.x - FOOD_HALF_SIZE && vertex.x <= food.x + FOOD_HALF_SIZE &&
+                        vertex.y >= food.y - FOOD_HALF_SIZE && vertex.y <= food.y + FOOD_HALF_SIZE) {
+                        return true;
+                    }
+                }
+
+                let triangleEdges = [
+                    [triangle[0], triangle[1]],
+                    [triangle[1], triangle[2]],
+                    [triangle[2], triangle[0]]
+                ];
+
+                let rectEdges = [
+                    [foodRect[0], foodRect[1]],
+                    [foodRect[1], foodRect[2]],
+                    [foodRect[2], foodRect[3]],
+                    [foodRect[3], foodRect[0]]
+                ];
+
+                for (let triEdge of triangleEdges) {
+                    for (let rectEdge of rectEdges) {
+                        if (this.lineSegmentsIntersect(triEdge[0], triEdge[1], rectEdge[0], rectEdge[1])) {
+                            return true;
+                        }
+                    }
+                }
+
+                return false;
+            }
+
+            pointInTriangle(p, a, b, c) {
+                let v0x = c.x - a.x;
+                let v0y = c.y - a.y;
+                let v1x = b.x - a.x;
+                let v1y = b.y - a.y;
+                let v2x = p.x - a.x;
+                let v2y = p.y - a.y;
+
+                let dot00 = v0x * v0x + v0y * v0y;
+                let dot01 = v0x * v1x + v0y * v1y;
+                let dot02 = v0x * v2x + v0y * v2y;
+                let dot11 = v1x * v1x + v1y * v1y;
+                let dot12 = v1x * v2x + v1y * v2y;
+
+                let invDenom = 1 / (dot00 * dot11 - dot01 * dot01);
+                let u = (dot11 * dot02 - dot01 * dot12) * invDenom;
+                let v = (dot00 * dot12 - dot01 * dot02) * invDenom;
+
+                return (u >= 0) && (v >= 0) && (u + v <= 1);
+            }
+
+            lineSegmentsIntersect(p1, q1, p2, q2) {
+                function orientation(p, q, r) {
+                    let val = (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y);
+                    if (val == 0) return 0;
+                    return (val > 0) ? 1 : 2;
+                }
+
+                function onSegment(p, q, r) {
+                    return (q.x <= max(p.x, r.x) && q.x >= min(p.x, r.x) &&
+                            q.y <= max(p.y, r.y) && q.y >= min(p.y, r.y));
+                }
+
+                let o1 = orientation(p1, q1, p2);
+                let o2 = orientation(p1, q1, q2);
+                let o3 = orientation(p2, q2, p1);
+                let o4 = orientation(p2, q2, q1);
+
+                if (o1 != o2 && o3 != o4) return true;
+
+                if (o1 == 0 && onSegment(p1, p2, q1)) return true;
+                if (o2 == 0 && onSegment(p1, q2, q1)) return true;
+                if (o3 == 0 && onSegment(p2, p1, q2)) return true;
+                if (o4 == 0 && onSegment(p2, q1, q2)) return true;
+
+                return false;
+            }
+
+            display() {
+                push();
+                translate(this.x, this.y);
+                rotate(this.direction + HALF_PI);
+
+                // Draw blue glow if active (when ant is targeting food and food exists)
+                if (this.glowTimer > 0 && food.percentage > 0) {
+                    // Create radial gradient for the glow
+                    let glowRadius = ANT_DISPLAY_SIZE * 0.9; // 40% smaller than 1.5 * ANT_DISPLAY_SIZE
+                    let gradient = drawingContext.createRadialGradient(0, 0, 0, 0, 0, glowRadius);
+                    gradient.addColorStop(0, 'rgba(0, 150, 255, 200)'); // Solid blue at center
+                    gradient.addColorStop(1, 'rgba(0, 150, 255, 0)');   // Transparent blue at edge
+                    drawingContext.fillStyle = gradient;
+                    drawingContext.beginPath();
+                    drawingContext.arc(0, 0, glowRadius, 0, TWO_PI);
+                    drawingContext.fill();
+                }
+
+                // Scale the ant sprite if it has food to make it appear smaller
+
+                // Draw ant sprite
+                let col = this.frameIndex % ANT_FRAMES_PER_ROW;
+                let row = floor(this.frameIndex / ANT_FRAMES_PER_ROW);
+                let sx = col * ANT_FRAME_WIDTH;
+                let sy = row * ANT_FRAME_HEIGHT;
+
+                let spriteSheet = (this.team === 'Yellow') ? antYellowSpriteSheet : antRedSpriteSheet;
+                image(spriteSheet, 0, 0, ANT_DISPLAY_SIZE, ANT_DISPLAY_SIZE,
+                      sx, sy, ANT_FRAME_WIDTH, ANT_FRAME_HEIGHT);
+
+                // Draw food sprite attached to ant if hasFood (adjust position based on antScale)
+                if (this.hasFood) {
+                    // The food sprite should be scaled relative to the ant's new apparent size
+                    image(foodSourceSprite, 0, ANT_DISPLAY_SIZE / 4, ANT_DISPLAY_SIZE * 0.5, ANT_DISPLAY_SIZE * 0.5 );
+                }
+
+                pop();
+
+                this.drawVisionCone();
+                this.drawLabels();
+            }
+
+            drawVisionCone() {
+                push();
+                translate(this.x, this.y);
+                rotate(this.direction);
+
+                let originX = VISION_CONE_OFFSET;
+                let originY = 0;
+
+                let leftAngle = this.direction - this.visionAngle / 2;
+                let rightAngle = this.direction + this.visionAngle / 2;
+
+                let leftX = originX + this.visionLength * cos(leftAngle - this.direction);
+                let leftY = originY + this.visionLength * sin(leftAngle - this.direction);
+                let rightX = originX + this.visionLength * cos(rightAngle - this.direction);
+                let rightY = originY + this.visionLength * sin(rightAngle - this.direction);
+
+                fill(255, 255, 0, 30);
+                noStroke();
+                triangle(originX, originY, leftX, leftY, rightX, rightY);
+
+                pop();
+            }
+
+            drawLabels() {
+                push();
+                let labelX = this.x + ANT_DISPLAY_SIZE / 2 + 5;
+                let labelY = this.y - 10;
+
+                fill(0, 0, 0, 150);
+                noStroke();
+                rect(labelX - 2, labelY - 12, 50, 24, 2);
+
+                fill(255);
+                textAlign(LEFT, CENTER);
+                textSize(10);
+                text(Math.floor(this.life) + "%", labelX, labelY - 5);
+
+                fill(150, 255, 150);
+                text(this.speed.toFixed(1) + "x", labelX, labelY + 5);
+
+                pop();
+            }
+
+            constrainToCanvas() {
+                let bounced = false;
+                if (this.x < ANT_DISPLAY_SIZE/2) {
+                    this.x = ANT_DISPLAY_SIZE/2;
+                    this.direction = PI - this.direction;
+                    bounced = true;
+                } else if (this.x > width - ANT_DISPLAY_SIZE/2) {
+                    this.x = width - ANT_DISPLAY_SIZE/2;
+                    this.direction = PI - this.direction;
+                    bounced = true;
+                }
+                if (this.y < ANT_DISPLAY_SIZE/2) {
+                    this.y = ANT_DISPLAY_SIZE/2;
+                    this.direction = TWO_PI - this.direction;
+                    bounced = true;
+                } else if (this.y > height - ANT_DISPLAY_SIZE/2) {
+                    this.y = height - ANT_DISPLAY_SIZE/2;
+                    this.direction = TWO_PI - this.direction;
+                    bounced = true;
+                }
+
+                if (bounced) {
+                    this.direction += random(-0.2, 0.2);
+                }
+            }
+        }
+
+        function initializeAnts() {
+            let numAntsPerTeam = parseInt(antCountInput.value());
+            if (isNaN(numAntsPerTeam) || numAntsPerTeam < 1) {
+                numAntsPerTeam = 7;
+                antCountInput.value(7);
+            }
+
+            ants = [];
+            // Initialize Yellow Team ants
+            for (let i = 0; i < numAntsPerTeam; i++) {
+                let x = random(ANT_DISPLAY_SIZE, width / 2 - ANT_DISPLAY_SIZE);
+                let y = random(ANT_DISPLAY_SIZE, height - ANT_DISPLAY_SIZE);
+                ants.push(new Ant(x, y, 'Yellow'));
+            }
+            // Initialize Red Team ants
+            for (let i = 0; i < numAntsPerTeam; i++) {
+                let x = random(width / 2 + ANT_DISPLAY_SIZE, width - ANT_DISPLAY_SIZE);
+                let y = random(ANT_DISPLAY_SIZE, height - ANT_DISPLAY_SIZE);
+                ants.push(new Ant(x, y, 'Red'));
+            }
+        }
+
+        function resetSimulation() {
+            simulationRunning = true;
+            victoryMessageDiv.style('display', 'none');
+            deathAnimations = [];
+            placeFood();
+            yellowAnthill.completion = 0;
+            redAnthill.completion = 0;
+            initializeAnts();
+            console.log("Simulation reset!");
+        }
+
+        function updateStats() {
+            let statsDiv = document.getElementById('stats');
+            if (statsDiv) {
+                let aliveAnts = ants.length;
+                let aliveYellowAnts = ants.filter(ant => ant.team === 'Yellow').length;
+                let aliveRedAnts = ants.filter(ant => ant.team === 'Red').length;
+
+                let avgLifeYellow = aliveYellowAnts > 0 ? ants.filter(ant => ant.team === 'Yellow').reduce((sum, ant) => sum + ant.life, 0) / aliveYellowAnts : 0;
+                let avgSpeedYellow = aliveYellowAnts > 0 ? ants.filter(ant => ant.team === 'Yellow').reduce((sum, ant) => sum + ant.speed, 0) / aliveYellowAnts : 0;
+
+                let avgLifeRed = aliveRedAnts > 0 ? ants.filter(ant => ant.team === 'Red').reduce((sum, ant) => sum + ant.life, 0) / aliveRedAnts : 0;
+                let avgSpeedRed = aliveRedAnts > 0 ? ants.filter(ant => ant.team === 'Red').reduce((sum, ant) => sum + ant.speed, 0) / aliveRedAnts : 0;
+
+                statsDiv.innerHTML = `
+                    <h4>Simulation Stats</h4>
+                    <p>Total Alive Ants: ${aliveAnts}</p>
+                    <p>Yellow Ants: ${aliveYellowAnts}</p>
+                    <p>Red Ants: ${aliveRedAnts}</p>
+                    <p>Avg Life (Yellow): ${Math.floor(avgLifeYellow)}%</p>
+                    <p>Avg Speed (Yellow): ${avgSpeedYellow.toFixed(1)}x</p>
+                    <p>Avg Life (Red): ${Math.floor(avgLifeRed)}%</p>
+                    <p>Avg Speed (Red): ${avgSpeedRed.toFixed(1)}x</p>
+                `;
+            }
+        }
+
+        function endSimulation(winningTeam) {
+            simulationRunning = false;
+            victoryMessageDiv.html(winningTeam + " Team Wins!");
+            victoryMessageDiv.style('display', 'block');
+        }
+    </script>
+<div id="red-team-controls" class="team-controls">
+    <h3>Red Team Controls</h3>
+    <div class="slider-group">
+        <label for="redVisionAngle">Vision Angle: <span id="redVisionAngleValue">90°</span></label>
+        <input type="range" id="redVisionAngle" min="30" max="130" value="90">
+    </div>
+    <div class="slider-group">
+        <label for="redVisionLength">Vision Length: <span id="redVisionLengthValue">1.5</span></label>
+        <input type="range" id="redVisionLength" min="0.8" max="3.0" step="0.1" value="1.5">
+    </div>
+    <div class="slider-group">
+        <label for="redSpeed">Speed: <span id="redSpeedValue">1.0</span></label>
+        <input type="range" id="redSpeed" min="0.5" max="2.5" step="0.1" value="1.0">
+    </div>
+</div>
+</body>
+</html>
